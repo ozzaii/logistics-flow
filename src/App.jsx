@@ -3,8 +3,8 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://1ffc-34-143-163-90.ngrok-free.app";
-const API_URL = `${BASE_URL}/run/predict`;
+const BASE_URL = "https://13dd-34-143-163-90.ngrok-free.app";
+const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -80,7 +80,9 @@ const App = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           message: inputMessage
         })
@@ -93,8 +95,8 @@ const App = () => {
       const result = await response.json();
       console.log('Raw API Response:', result);
       
-      if (result.data) {
-        processAIResponse(result.data);
+      if (result.response) {
+        processAIResponse(result.response);
         setInputMessage('');
       } else {
         throw new Error('Unexpected response format');
