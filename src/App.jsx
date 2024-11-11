@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Gradio uses /api/predict by default
-const COLAB_URL = "https://af41-34-143-163-90.ngrok-free.app/api/predict";
+const COLAB_URL = "https://af41-34-143-163-90.ngrok-free.app/predict";
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
