@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
+
+const COLAB_URL = "https://12e9-34-143-163-90.ngrok-free.app/run/predict"; // Replace with your actual ngrok URL
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -10,7 +12,7 @@ const App = () => {
     transportSeekingCargo: []
   });
 
-  const processAIResponse = (response) => {
+  const processAIResponse = useCallback((response) => {
     const lines = response.split('\n');
     const entry = {};
     
@@ -21,43 +23,40 @@ const App = () => {
       }
     });
 
-    if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
-      setEntries(prev => ({
-        ...prev,
-        cargoSeekingTransport: [...prev.cargoSeekingTransport, {
-          id: Date.now(),
-          loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
-          unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
-          cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
-          vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
-          amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
-          contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
-          extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ',
-          timestamp: new Date().toISOString()
-        }]
-      }));
-    } else {
-      setEntries(prev => ({
-        ...prev,
-        transportSeekingCargo: [...prev.transportSeekingCargo, {
-          id: Date.now(),
-          loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
-          unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
-          cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
-          vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
-          amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
-          contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
-          extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ',
-          timestamp: new Date().toISOString()
-        }]
-      }));
-    }
-  };
+    // Add unique ID and timestamp
+    const newEntry = {
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
+      unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
+      cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
+      vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
+      amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
+      contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
+      extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
+    };
+
+    setEntries(prev => {
+      if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
+        return {
+          ...prev,
+          cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
+        };
+      } else {
+        return {
+          ...prev,
+          transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
+        };
+      }
+    });
+  }, []);
 
   const handleSubmit = async () => {
+    if (!inputMessage.trim()) return;
+    
     setIsLoading(true);
     try {
-      const response = await fetch('YOUR_COLAB_NGROK_URL', {
+      const response = await fetch(COLAB_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,12 +65,25 @@ const App = () => {
       });
       
       const result = await response.json();
-      processAIResponse(result.data[0]);
+      
+      if (result.data && result.data[0]) {
+        processAIResponse(result.data[0]);
+      }
+      
       setInputMessage('');
     } catch (error) {
       console.error('Error:', error);
+      alert('Bağlantı hatası! Lütfen tekrar deneyin.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   return (
@@ -85,14 +97,18 @@ const App = () => {
           <textarea
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
             placeholder="Lojistik mesajını buraya yapıştırın..."
             className="w-full h-32 p-4 border rounded-lg mb-4 resize-none"
+            disabled={isLoading}
           />
           <button
             onClick={handleSubmit}
-            disabled={isLoading}
-            className={`w-full py-2 px-4 rounded-lg text-white font-medium ${
-              isLoading ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+            disabled={isLoading || !inputMessage.trim()}
+            className={`w-full py-2 px-4 rounded-lg text-white font-medium transition-colors ${
+              isLoading || !inputMessage.trim() 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-blue-500 hover:bg-blue-600'
             }`}
           >
             {isLoading ? 'İşleniyor...' : 'Mesajı İşle'}
