@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, Package, Calendar, MapPin, Info, Weight } from 'lucide-react';
+import { Truck, Package, Calendar, MapPin, Info, Scale } from 'lucide-react';
 
 const EntryCard = ({ entry }) => {
   return (
@@ -57,7 +57,7 @@ const EntryCard = ({ entry }) => {
 
         {/* Amount/Tonnage Info */}
         <div className="flex items-start gap-3">
-          <Weight className="w-5 h-5 text-blue-500 mt-1 flex-shrink-0" />
+          <Scale className="w-5 h-5 text-blue-500 mt-1 flex-shrink-0" />
           <div>
             <p className="text-xs uppercase tracking-wider text-gray-500 font-medium">Tonaj/Miktar</p>
             <p className="font-medium text-gray-800">{entry.amount || 'BELİRTİLMEMİŞ'}</p>
