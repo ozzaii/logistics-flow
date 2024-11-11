@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
-const COLAB_URL = "https://12e9-34-143-163-90.ngrok-free.app/run/predict"; // Replace with your actual ngrok URL
+// Gradio uses /api/predict by default
+const COLAB_URL = "https://af41-34-143-163-90.ngrok-free.app/api/predict";
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -13,42 +14,47 @@ const App = () => {
   });
 
   const processAIResponse = useCallback((response) => {
-    const lines = response.split('\n');
-    const entry = {};
-    
-    lines.forEach(line => {
-      if (line.includes(':')) {
-        const [key, value] = line.split(':').map(s => s.trim());
-        entry[key] = value;
-      }
-    });
+    try {
+      // Gradio returns response in a specific format
+      const lines = response.split('\n');
+      const entry = {};
+      
+      lines.forEach(line => {
+        if (line.includes(':')) {
+          const [key, value] = line.split(':').map(s => s.trim());
+          entry[key] = value;
+        }
+      });
 
-    // Add unique ID and timestamp
-    const newEntry = {
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
-      unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
-      cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
-      vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
-      amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
-      contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
-      extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
-    };
+      const newEntry = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
+        unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
+        cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
+        vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
+        amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
+        contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
+        extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
+      };
 
-    setEntries(prev => {
-      if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
-        return {
-          ...prev,
-          cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
-        };
-      } else {
-        return {
-          ...prev,
-          transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
-        };
-      }
-    });
+      setEntries(prev => {
+        if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
+          return {
+            ...prev,
+            cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
+          };
+        } else {
+          return {
+            ...prev,
+            transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
+          };
+        }
+      });
+    } catch (error) {
+      console.error('Error processing response:', error);
+      alert('AI yanıtı işlenirken hata oluştu!');
+    }
   }, []);
 
   const handleSubmit = async () => {
@@ -56,24 +62,36 @@ const App = () => {
     
     setIsLoading(true);
     try {
+      // Format specifically for Gradio API
       const response = await fetch(COLAB_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ data: [inputMessage] })
+        body: JSON.stringify({
+          data: [
+            inputMessage
+          ]
+        })
       });
       
-      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
-      if (result.data && result.data[0]) {
-        processAIResponse(result.data[0]);
+      const result = await response.json();
+      console.log('AI Response:', result); // For debugging
+      
+      if (result.data) {
+        processAIResponse(result.data);
+      } else {
+        throw new Error('Invalid response format');
       }
       
       setInputMessage('');
     } catch (error) {
       console.error('Error:', error);
-      alert('Bağlantı hatası! Lütfen tekrar deneyin.');
+      alert('Bağlantı hatası! AI servisine ulaşılamıyor.');
     } finally {
       setIsLoading(false);
     }
