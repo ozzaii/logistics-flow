@@ -2,8 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
-// Update the URL to use /predict instead of /api/predict
-const COLAB_URL = "https://8848-34-143-163-90.ngrok-free.app/predict";
+// Updated API configuration
+const BASE_URL = "https://cea2-34-143-163-90.ngrok-free.app";
+const API_URL = `${BASE_URL}/run/predict`;
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -15,9 +16,11 @@ const App = () => {
 
   const processAIResponse = useCallback((response) => {
     try {
-      // Split the response into lines and process
-      console.log("Raw response:", response); // Debug log
-      const lines = response.split('\n').filter(line => line.trim());
+      console.log("Processing response:", response);
+      // Updated response handling for Gradio's format
+      const responseText = Array.isArray(response) ? response[0] : response;
+      
+      const lines = responseText.split('\n').filter(line => line.trim());
       
       // Initialize empty entry object
       const entry = {};
@@ -72,15 +75,15 @@ const App = () => {
     
     setIsLoading(true);
     try {
-      const response = await fetch(COLAB_URL, {
+      console.log("Sending request to:", API_URL);
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
-        mode: 'cors',
-        credentials: 'include',
+        // Updated request body format for Gradio
         body: JSON.stringify({
+          fn_index: 0,
           data: [inputMessage]
         })
       });
@@ -90,10 +93,10 @@ const App = () => {
       }
       
       const result = await response.json();
-      console.log('Raw API Response:', result); // Debug log
+      console.log('Raw API Response:', result);
       
-      if (result.data && result.data[0]) {
-        processAIResponse(result.data[0]);
+      if (result.data) {
+        processAIResponse(result.data);
         setInputMessage('');
       } else {
         throw new Error('Unexpected response format');
