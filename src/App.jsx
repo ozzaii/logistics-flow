@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://cea2-34-143-163-90.ngrok-free.app";
+const BASE_URL = "https://1ffc-34-143-163-90.ngrok-free.app";
 const API_URL = `${BASE_URL}/run/predict`;
 
 const App = () => {
@@ -81,10 +81,8 @@ const App = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Updated request body format for Gradio
         body: JSON.stringify({
-          fn_index: 0,
-          data: [inputMessage]
+          message: inputMessage
         })
       });
       
