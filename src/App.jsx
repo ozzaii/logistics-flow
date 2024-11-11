@@ -2,8 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
-// Gradio uses /api/predict by default
-const COLAB_URL = "https://af41-34-143-163-90.ngrok-free.app/predict";
+// Update the URL to use /predict instead of /api/predict
+const COLAB_URL = "https://4328-34-143-163-90.ngrok-free.app/predict";
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -15,17 +15,26 @@ const App = () => {
 
   const processAIResponse = useCallback((response) => {
     try {
-      // Gradio returns response in a specific format
-      const lines = response.split('\n');
+      // Split the response into lines and process
+      console.log("Raw response:", response); // Debug log
+      const lines = response.split('\n').filter(line => line.trim());
+      
+      // Initialize empty entry object
       const entry = {};
       
+      // Process each line
       lines.forEach(line => {
         if (line.includes(':')) {
           const [key, value] = line.split(':').map(s => s.trim());
-          entry[key] = value;
+          if (key && value) {
+            entry[key] = value;
+          }
         }
       });
 
+      console.log("Processed entry:", entry); // Debug log
+
+      // Create new entry with fallbacks
       const newEntry = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
@@ -52,8 +61,9 @@ const App = () => {
         }
       });
     } catch (error) {
-      console.error('Error processing response:', error);
-      alert('AI yanıtı işlenirken hata oluştu!');
+      console.error('Error processing AI response:', error);
+      console.error('Raw response was:', response);
+      alert('AI yanıtı işlenirken hata oluştu! Lütfen konsolu kontrol edin.');
     }
   }, []);
 
@@ -62,16 +72,13 @@ const App = () => {
     
     setIsLoading(true);
     try {
-      // Format specifically for Gradio API
       const response = await fetch(COLAB_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          data: [
-            inputMessage
-          ]
+          data: [inputMessage]
         })
       });
       
@@ -80,18 +87,17 @@ const App = () => {
       }
       
       const result = await response.json();
-      console.log('AI Response:', result); // For debugging
+      console.log('Raw API Response:', result); // Debug log
       
-      if (result.data) {
-        processAIResponse(result.data);
+      if (result.data && result.data[0]) {
+        processAIResponse(result.data[0]);
+        setInputMessage('');
       } else {
-        throw new Error('Invalid response format');
+        throw new Error('Unexpected response format');
       }
-      
-      setInputMessage('');
     } catch (error) {
-      console.error('Error:', error);
-      alert('Bağlantı hatası! AI servisine ulaşılamıyor.');
+      console.error('API Error:', error);
+      alert('Bağlantı hatası! AI servisine ulaşılamıyor. Lütfen konsolu kontrol edin.');
     } finally {
       setIsLoading(false);
     }
