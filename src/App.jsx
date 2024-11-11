@@ -18,84 +18,59 @@ const App = () => {
     try {
       console.log("Processing response:", response);
       
-      // Handle array response
+      // Extract the assistant's response content
+      let analysisText;
       if (Array.isArray(response)) {
-        response.forEach(item => {
-          // Create new entry directly from the object
-          const newEntry = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
-            loadingLocation: item['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
-            unloadingLocation: item['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
-            cargoType: item['Yük Tipi'] || 'BELİRTİLMEMİŞ',
-            vehicleType: item['Araç Tipi'] || 'BELİRTİLMEMİŞ',
-            amount: item['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
-            contact: item['İletişim'] || 'BELİRTİLMEMİŞ',
-            extraInfo: item['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
-          };
-
-          setEntries(prev => {
-            if (item['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
-              return {
-                ...prev,
-                cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
-              };
-            } else {
-              return {
-                ...prev,
-                transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
-              };
-            }
-          });
-        });
+        // Find the assistant's message in the array
+        const assistantMessage = response.find(msg => msg.role === 'assistant');
+        analysisText = assistantMessage?.content || '';
       } else {
-        // Fallback to existing string processing logic
-        const responseText = response;
-        
-        const lines = responseText.split('\n').filter(line => line.trim());
-        
-        // Initialize empty entry object
-        const entry = {};
-        
-        // Process each line
-        lines.forEach(line => {
-          if (line.includes(':')) {
-            const [key, value] = line.split(':').map(s => s.trim());
-            if (key && value) {
-              entry[key] = value;
-            }
-          }
-        });
-
-        console.log("Processed entry:", entry); // Debug log
-
-        // Create new entry with fallbacks
-        const newEntry = {
-          id: Date.now(),
-          timestamp: new Date().toISOString(),
-          loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
-          unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
-          cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
-          vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
-          amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
-          contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
-          extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
-        };
-
-        setEntries(prev => {
-          if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
-            return {
-              ...prev,
-              cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
-            };
-          } else {
-            return {
-              ...prev,
-              transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
-            };
-          }
-        });
+        analysisText = response;
       }
+
+      // Parse the analysis text into an object
+      const entry = {};
+      const lines = analysisText.split('\n').filter(line => line.trim());
+      
+      lines.forEach(line => {
+        if (line.includes(':')) {
+          const [key, value] = line.split(':').map(s => s.trim());
+          if (key && value) {
+            // Remove the numbering from the key
+            const cleanKey = key.replace(/^\d+\.\s*/, '');
+            entry[cleanKey] = value;
+          }
+        }
+      });
+
+      // Create new entry with the parsed data
+      const newEntry = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
+        unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
+        cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
+        vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
+        amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
+        contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
+        extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
+      };
+
+      // Update entries based on message type
+      setEntries(prev => {
+        if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
+          return {
+            ...prev,
+            cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
+          };
+        } else {
+          return {
+            ...prev,
+            transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
+          };
+        }
+      });
+
     } catch (error) {
       console.error('Error processing AI response:', error);
       console.error('Raw response was:', response);
