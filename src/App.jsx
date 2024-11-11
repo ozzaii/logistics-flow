@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Update the URL to use /predict instead of /api/predict
-const COLAB_URL = "https://4328-34-143-163-90.ngrok-free.app/predict";
+const COLAB_URL = "https://8848-34-143-163-90.ngrok-free.app/predict";
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -76,7 +76,10 @@ const App = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
+        mode: 'cors',
+        credentials: 'include',
         body: JSON.stringify({
           data: [inputMessage]
         })
