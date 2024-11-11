@@ -10,7 +10,6 @@ const App = () => {
     transportSeekingCargo: []
   });
 
-  // Function to process AI response and update tables
   const processAIResponse = (response) => {
     const lines = response.split('\n');
     const entry = {};
@@ -78,9 +77,10 @@ const App = () => {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold text-center mb-8">Lojistik Mesaj İşlemcisi</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">
+          Lojistik Mesaj İşlemcisi
+        </h1>
         
-        {/* Input Area */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <textarea
             value={inputMessage}
@@ -99,7 +99,6 @@ const App = () => {
           </button>
         </div>
 
-        {/* Dashboard Component */}
         <LogisticsDashboard 
           cargoSeekingTransport={entries.cargoSeekingTransport}
           transportSeekingCargo={entries.transportSeekingCargo}
