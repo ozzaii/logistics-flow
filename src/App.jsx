@@ -16,7 +16,7 @@ const App = () => {
 
   useEffect(() => {
     // Connect to WhatsApp listener WebSocket
-    const ws = new WebSocket('ws://localhost:8080');
+    const ws = new WebSocket('ws://localhost:3030');
 
     ws.onopen = () => {
       console.log('Connected to WhatsApp listener');
