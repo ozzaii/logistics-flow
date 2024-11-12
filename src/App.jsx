@@ -18,27 +18,22 @@ const App = () => {
     try {
       console.log("Processing response:", response);
       
-      // Extract the assistant's response content
-      let analysisText;
-      if (Array.isArray(response)) {
-        // Find the assistant's message in the array
-        const assistantMessage = response.find(msg => msg.role === 'assistant');
-        analysisText = assistantMessage?.content || '';
-      } else {
-        analysisText = response;
-      }
+      // Remove markdown formatting and clean up the response
+      const cleanResponse = response
+        .replace(/^#+\s*.*\n*/g, '')  // Remove headers
+        .replace(/\*\*/g, '')         // Remove bold markers
+        .trim();
 
       // Parse the analysis text into an object
       const entry = {};
-      const lines = analysisText.split('\n').filter(line => line.trim());
+      const lines = cleanResponse.split('\n').filter(line => line.trim());
       
       lines.forEach(line => {
-        if (line.includes(':')) {
-          const [key, value] = line.split(':').map(s => s.trim());
+        const match = line.match(/(\d+\.\s*)?([^:]+):\s*(.*)/);
+        if (match) {
+          const [, , key, value] = match;
           if (key && value) {
-            // Remove the numbering from the key
-            const cleanKey = key.replace(/^\d+\.\s*/, '');
-            entry[cleanKey] = value;
+            entry[key.trim()] = value.trim();
           }
         }
       });
@@ -47,6 +42,7 @@ const App = () => {
       const newEntry = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
+        messageType: entry['Mesaj Tipi'] || 'BELİRTİLMEMİŞ',
         loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
         unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
         cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
