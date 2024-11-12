@@ -93,7 +93,7 @@ const LogisticsDashboard = ({ cargoSeekingTransport, transportSeekingCargo }) =>
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
           <Package className="w-6 h-6 text-blue-500" />
-          <h2 className="text-xl font-semibold">Yük İlanları</h2>
+          <h2 className="text-xl font-semibold">Araç Arayanlar</h2>
           <span className="ml-auto bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
             {cargoSeekingTransport.length}
           </span>
@@ -109,7 +109,7 @@ const LogisticsDashboard = ({ cargoSeekingTransport, transportSeekingCargo }) =>
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center gap-2 mb-4">
           <Truck className="w-6 h-6 text-blue-500" />
-          <h2 className="text-xl font-semibold">Araç Arayanlar</h2>
+          <h2 className="text-xl font-semibold">Yük Arayanlar</h2>
           <span className="ml-auto bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
             {transportSeekingCargo.length}
           </span>
