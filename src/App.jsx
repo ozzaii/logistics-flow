@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://bde7-34-126-184-39.ngrok-free.app";
+const BASE_URL = "https://523b-34-126-184-39.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
@@ -18,25 +18,27 @@ const App = () => {
     try {
       console.log("Processing response:", response);
       
-      // Remove markdown formatting and clean up the response
-      const cleanResponse = response
-        .replace(/^#+\s*.*\n*/g, '')  // Remove headers
-        .replace(/\*\*/g, '')         // Remove bold markers
-        .trim();
+      // Remove any extra text after the analysis
+      const cleanResponse = response.split(/Umarım|Başka/)[0];
 
-      // Parse the analysis text into an object
-      const entry = {};
-      const lines = cleanResponse.split('\n').filter(line => line.trim());
+      // Extract the key-value pairs using a more flexible regex
+      const pairs = cleanResponse.match(/(?:\*\*)?(?:\d+\.)?\s*(?:\*\*)?([^:]+):\s*([^\n]+)/g) || [];
       
-      lines.forEach(line => {
-        const match = line.match(/(\d+\.\s*)?([^:]+):\s*(.*)/);
-        if (match) {
-          const [, , key, value] = match;
-          if (key && value) {
-            entry[key.trim()] = value.trim();
-          }
+      // Parse into an object
+      const entry = {};
+      pairs.forEach(pair => {
+        const [key, value] = pair
+          .replace(/\*\*/g, '')         // Remove bold markers
+          .replace(/^\d+\.\s*/, '')     // Remove numbering
+          .split(':')
+          .map(s => s.trim());
+        
+        if (key && value) {
+          entry[key] = value;
         }
       });
+
+      console.log("Parsed entry:", entry);  // Debug log
 
       // Create new entry with the parsed data
       const newEntry = {
@@ -52,24 +54,30 @@ const App = () => {
         extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
       };
 
+      console.log("Created entry:", newEntry);  // Debug log
+
       // Update entries based on message type
       setEntries(prev => {
-        if (entry['Mesaj Tipi']?.includes('CARGO_SEEKING_TRANSPORT')) {
+        if (entry['Mesaj Tipi']?.toLowerCase().includes('cargo_seeking_transport')) {
           return {
             ...prev,
             cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
           };
-        } else {
+        } else if (entry['Mesaj Tipi']?.toLowerCase().includes('transport_seeking_cargo')) {
           return {
             ...prev,
             transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
           };
+        } else {
+          console.warn('Unknown message type:', entry['Mesaj Tipi']);
+          return prev;
         }
       });
 
     } catch (error) {
       console.error('Error processing AI response:', error);
       console.error('Raw response was:', response);
+      console.error('Parsed entry was:', entry);
       alert('AI yanıtı işlenirken hata oluştu! Lütfen konsolu kontrol edin.');
     }
   }, []);
