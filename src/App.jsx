@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://9fef-34-142-233-221.ngrok-free.app";
+const BASE_URL = "https://5203-34-143-163-90.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
@@ -13,6 +13,29 @@ const App = () => {
     cargoSeekingTransport: [],
     transportSeekingCargo: []
   });
+
+  useEffect(() => {
+    // Connect to WhatsApp listener WebSocket
+    const ws = new WebSocket('ws://localhost:8080');
+
+    ws.onopen = () => {
+      console.log('Connected to WhatsApp listener');
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'new_classification') {
+        processAIResponse(data.data.classification);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('Disconnected from WhatsApp listener');
+    };
+
+    return () => ws.close();
+  }, [processAIResponse]);
 
   const processAIResponse = useCallback((response) => {
     try {
