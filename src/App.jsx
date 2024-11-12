@@ -18,54 +18,28 @@ const App = () => {
     try {
       console.log("Processing response:", response);
       
-      // Skip if response contains schema or example patterns
-      if (response.includes('```json') || 
-          response.includes('[CARGO_SEEKING_TRANSPORT/TRANSPORT_SEEKING_CARGO]') ||
-          response.includes('mesaj numarası')) {
-        console.warn('Received schema/example response instead of analysis');
-        alert('AI örnek şema döndürdü. Lütfen mesajınızı tekrar gönderin.');
-        return;
-      }
-
-      // Remove any extra text after the analysis
-      const cleanResponse = response.split(/Umarım|Başka|Unutmayın/)[0];
-
-      // Updated regex pattern to better match numbered and unnumbered key-value pairs
-      const pairs = cleanResponse.match(/(?:\d+\.)?\s*(?:\*\*)?([^:\n]+):([^\n]+)/g) || [];
-      
-      if (pairs.length === 0) {
-        console.warn('No valid key-value pairs found in response');
+      // Extract just the numbered list part using regex
+      const listMatch = response.match(/1\.\s*Mesaj Tipi:[\s\S]*?(?=\n\n|$)/);
+      if (!listMatch) {
+        console.warn('No numbered list found in response');
         alert('AI yanıtı analiz edilemedi. Lütfen mesajınızı tekrar gönderin.');
         return;
       }
 
-      // Parse into an object with improved key cleaning
+      const listText = listMatch[0];
+      
+      // Parse each numbered line
       const entry = {};
-      pairs.forEach(pair => {
-        // Updated regex to better handle the key-value extraction
-        const match = pair.match(/(?:\d+\.)?\s*(?:\*\*)?([^:\n]+):\s*(.+)/);
+      const lines = listText.split('\n');
+      
+      lines.forEach(line => {
+        // Match lines like "1. Mesaj Tipi: CARGO_SEEKING_TRANSPORT"
+        const match = line.match(/\d+\.\s*([^:]+):\s*(.+)/);
         if (match) {
           const [, key, value] = match;
-          const cleanKey = key
-            .replace(/\*\*/g, '')
-            .replace(/^\d+\.\s*/, '')
-            .trim();
-          const cleanValue = value
-            .replace(/\*\*/g, '')
-            .trim();
-          
-          if (cleanKey && cleanValue) {
-            entry[cleanKey] = cleanValue;
-          }
+          entry[key.trim()] = value.trim();
         }
       });
-
-      // Validate required fields
-      if (!entry['Mesaj Tipi']) {
-        console.warn('Message type not found in response');
-        alert('Mesaj tipi bulunamadı. Lütfen mesajınızı tekrar gönderin.');
-        return;
-      }
 
       console.log("Parsed entry:", entry);
 
@@ -82,8 +56,6 @@ const App = () => {
         contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
         extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
       };
-
-      console.log("Created entry:", newEntry);
 
       // Update entries based on message type
       setEntries(prev => {
