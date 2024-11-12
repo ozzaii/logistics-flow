@@ -30,8 +30,8 @@ const App = () => {
       // Remove any extra text after the analysis
       const cleanResponse = response.split(/Umarım|Başka|Unutmayın/)[0];
 
-      // Extract the key-value pairs using a more flexible regex
-      const pairs = cleanResponse.match(/(?:\*\*)?(?:\d+\.)?\s*(?:\*\*)?([^:]+):\s*([^\n]+)/g) || [];
+      // Updated regex pattern to better match numbered and unnumbered key-value pairs
+      const pairs = cleanResponse.match(/(?:\d+\.)?\s*(?:\*\*)?([^:\n]+):([^\n]+)/g) || [];
       
       if (pairs.length === 0) {
         console.warn('No valid key-value pairs found in response');
@@ -39,17 +39,24 @@ const App = () => {
         return;
       }
 
-      // Parse into an object
+      // Parse into an object with improved key cleaning
       const entry = {};
       pairs.forEach(pair => {
-        const [key, value] = pair
-          .replace(/\*\*/g, '')         // Remove bold markers
-          .replace(/^\d+\.\s*/, '')     // Remove numbering
-          .split(':')
-          .map(s => s.trim());
-        
-        if (key && value) {
-          entry[key] = value;
+        // Updated regex to better handle the key-value extraction
+        const match = pair.match(/(?:\d+\.)?\s*(?:\*\*)?([^:\n]+):\s*(.+)/);
+        if (match) {
+          const [, key, value] = match;
+          const cleanKey = key
+            .replace(/\*\*/g, '')
+            .replace(/^\d+\.\s*/, '')
+            .trim();
+          const cleanValue = value
+            .replace(/\*\*/g, '')
+            .trim();
+          
+          if (cleanKey && cleanValue) {
+            entry[cleanKey] = cleanValue;
+          }
         }
       });
 
