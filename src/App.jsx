@@ -18,12 +18,27 @@ const App = () => {
     try {
       console.log("Processing response:", response);
       
+      // Skip if response contains schema or example patterns
+      if (response.includes('```json') || 
+          response.includes('[CARGO_SEEKING_TRANSPORT/TRANSPORT_SEEKING_CARGO]') ||
+          response.includes('mesaj numarası')) {
+        console.warn('Received schema/example response instead of analysis');
+        alert('AI örnek şema döndürdü. Lütfen mesajınızı tekrar gönderin.');
+        return;
+      }
+
       // Remove any extra text after the analysis
-      const cleanResponse = response.split(/Umarım|Başka/)[0];
+      const cleanResponse = response.split(/Umarım|Başka|Unutmayın/)[0];
 
       // Extract the key-value pairs using a more flexible regex
       const pairs = cleanResponse.match(/(?:\*\*)?(?:\d+\.)?\s*(?:\*\*)?([^:]+):\s*([^\n]+)/g) || [];
       
+      if (pairs.length === 0) {
+        console.warn('No valid key-value pairs found in response');
+        alert('AI yanıtı analiz edilemedi. Lütfen mesajınızı tekrar gönderin.');
+        return;
+      }
+
       // Parse into an object
       const entry = {};
       pairs.forEach(pair => {
@@ -38,7 +53,14 @@ const App = () => {
         }
       });
 
-      console.log("Parsed entry:", entry);  // Debug log
+      // Validate required fields
+      if (!entry['Mesaj Tipi']) {
+        console.warn('Message type not found in response');
+        alert('Mesaj tipi bulunamadı. Lütfen mesajınızı tekrar gönderin.');
+        return;
+      }
+
+      console.log("Parsed entry:", entry);
 
       // Create new entry with the parsed data
       const newEntry = {
@@ -54,7 +76,7 @@ const App = () => {
         extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
       };
 
-      console.log("Created entry:", newEntry);  // Debug log
+      console.log("Created entry:", newEntry);
 
       // Update entries based on message type
       setEntries(prev => {
@@ -70,6 +92,7 @@ const App = () => {
           };
         } else {
           console.warn('Unknown message type:', entry['Mesaj Tipi']);
+          alert('Geçersiz mesaj tipi. Lütfen mesajınızı tekrar gönderin.');
           return prev;
         }
       });
@@ -77,8 +100,7 @@ const App = () => {
     } catch (error) {
       console.error('Error processing AI response:', error);
       console.error('Raw response was:', response);
-      console.error('Parsed entry was:', entry);
-      alert('AI yanıtı işlenirken hata oluştu! Lütfen konsolu kontrol edin.');
+      alert('AI yanıtı işlenirken hata oluştu! Lütfen mesajınızı tekrar gönderin.');
     }
   }, []);
 
