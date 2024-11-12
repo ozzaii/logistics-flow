@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://34bc-34-126-184-39.ngrok-free.app";
+const BASE_URL = "https://bde7-34-126-184-39.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
