@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://5c39-34-142-233-221.ngrok-free.app";
+const BASE_URL = "https://f6d5-34-142-233-221.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
@@ -206,6 +206,80 @@ const App = () => {
     }
   };
 
+  // Add this new component
+  const LogisticsInput = ({ isLoading }) => {
+    const [inputMessage, setInputMessage] = useState('');
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      if (!inputMessage.trim()) return;
+
+      try {
+        const response = await fetch('http://localhost:3033/message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: inputMessage.trim() })
+        });
+
+        if (!response.ok) throw new Error('Failed to send message');
+        
+        setInputMessage(''); // Clear input on success
+      } catch (error) {
+        console.error('Error sending message:', error);
+        alert('Mesaj gönderilirken bir hata oluştu.');
+      }
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="mb-8 p-4 bg-white rounded-lg shadow">
+        <div className="space-y-4">
+          <label 
+            htmlFor="whatsapp-message" 
+            className="block text-sm font-medium text-gray-700"
+          >
+            WhatsApp Mesajı
+          </label>
+          
+          <textarea
+            id="whatsapp-message"
+            name="whatsapp-message"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            placeholder="WhatsApp mesajını buraya yapıştırın..."
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            rows="4"
+            disabled={isLoading}
+          />
+          
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isLoading || !inputMessage.trim()}
+              className={`
+                px-4 py-2 rounded-md text-white
+                ${isLoading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'}
+              `}
+            >
+              {isLoading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  İşleniyor...
+                </span>
+              ) : 'Gönder'}
+            </button>
+          </div>
+        </div>
+      </form>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="container mx-auto p-4">
@@ -224,27 +298,7 @@ const App = () => {
            wsStatus === 'error' ? 'Bağlantı Hatası' : 'Bağlanıyor...'}
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <textarea
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Lojistik mesajını buraya yapıştırın..."
-            className="w-full h-32 p-4 border rounded-lg mb-4 resize-none"
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || !inputMessage.trim()}
-            className={`w-full py-2 px-4 rounded-lg text-white font-medium transition-colors ${
-              isLoading || !inputMessage.trim() 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-500 hover:bg-blue-600'
-            }`}
-          >
-            {isLoading ? 'İşleniyor...' : 'Mesajı İşle'}
-          </button>
-        </div>
+        <LogisticsInput isLoading={isLoading} />
 
         <LogisticsDashboard 
           cargoSeekingTransport={entries.cargoSeekingTransport}
