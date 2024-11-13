@@ -3,17 +3,32 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://6baa-34-142-233-221.ngrok-free.app";
+const BASE_URL = "https://5c39-34-142-233-221.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
+
+const STORAGE_KEY = 'logistics_classifications';
+
+const loadStoredEntries = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {
+      cargoSeekingTransport: [],
+      transportSeekingCargo: []
+    };
+  } catch (error) {
+    console.error('Error loading stored entries:', error);
+    return {
+      cargoSeekingTransport: [],
+      transportSeekingCargo: []
+    };
+  }
+};
 
 const App = () => {
   // 1. Define all state hooks first
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [entries, setEntries] = useState({
-    cargoSeekingTransport: [],
-    transportSeekingCargo: []
-  });
+  const [entries, setEntries] = useState(loadStoredEntries());
   const [wsStatus, setWsStatus] = useState('disconnected');
 
   // 2. Define refs after state
@@ -80,11 +95,14 @@ const App = () => {
         return newState;
       });
 
+      // Save to localStorage
+      saveEntries(newState);
+
     } catch (error) {
       console.error('Error processing AI response:', error);
       console.error('Raw response was:', response);
     }
-  }, []); // Empty dependency array since it doesn't depend on any state
+  }, [saveEntries]); // Empty dependency array since it doesn't depend on any state
 
   // 4. Define connectWebSocket after processAIResponse
   const connectWebSocket = useCallback(() => {
@@ -188,6 +206,27 @@ const App = () => {
       handleSubmit();
     }
   };
+
+  // Add function to save entries
+  const saveEntries = useCallback((newEntries) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
+    } catch (error) {
+      console.error('Error saving entries:', error);
+    }
+  }, []);
+
+  // Add delete functionality
+  const deleteEntry = useCallback((id, type) => {
+    setEntries(prev => {
+      const newState = {
+        ...prev,
+        [type]: prev[type].filter(entry => entry.id !== id)
+      };
+      saveEntries(newState);
+      return newState;
+    });
+  }, [saveEntries]);
 
   return (
     <div className="min-h-screen bg-gray-100">
