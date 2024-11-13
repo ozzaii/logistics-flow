@@ -1,42 +1,95 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
+// Updated API configuration
+const BASE_URL = "https://d412-34-142-233-221.ngrok-free.app";
+const API_URL = `${BASE_URL}/predict`;
+
 const App = () => {
-  // Initialize state first
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [entries, setEntries] = useState({
     cargoSeekingTransport: [],
     transportSeekingCargo: []
   });
+  const [wsStatus, setWsStatus] = useState('disconnected');
+  const ws = useRef(null);
+  const reconnectTimeout = useRef(null);
+  const maxReconnectDelay = 5000;
 
-  // WebSocket connection in useMemo
-  const ws = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      return new WebSocket('ws://localhost:3030');
-    }
-    return null;
-  }, []);
+  const connectWebSocket = useCallback(() => {
+    if (ws.current?.readyState === WebSocket.OPEN) return;
 
-  // Process AI response
+    ws.current = new WebSocket('ws://localhost:3032');
+
+    ws.current.onopen = () => {
+      console.log('Connected to WhatsApp listener');
+      setWsStatus('connected');
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
+    };
+
+    ws.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'new_classification') {
+        processAIResponse(data.data.classification);
+      } else if (data.type === 'status') {
+        setWsStatus(data.status);
+      }
+    };
+
+    ws.current.onclose = () => {
+      console.log('Disconnected from WhatsApp listener');
+      setWsStatus('disconnected');
+      reconnectTimeout.current = setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        connectWebSocket();
+      }, Math.random() * maxReconnectDelay);
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setWsStatus('error');
+    };
+  }, [processAIResponse]);
+
+  useEffect(() => {
+    connectWebSocket();
+
+    return () => {
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
+  }, [connectWebSocket]);
+
   const processAIResponse = useCallback((response) => {
-    if (!response) return;
-
     try {
       console.log("Processing response:", response);
       
+      // Extract just the numbered list part using regex
       const listMatch = response.match(/1\.\s*Mesaj Tipi:[\s\S]*?(?=\n\n|$)/);
       if (!listMatch) {
         console.warn('No numbered list found in response');
+        alert('AI yanıtı analiz edilemedi. Lütfen mesajınızı tekrar gönderin.');
         return;
       }
 
       const listText = listMatch[0];
+      
+      // Parse each numbered line
       const entry = {};
       const lines = listText.split('\n');
       
       lines.forEach(line => {
+        // Match lines like "1. Mesaj Tipi: CARGO_SEEKING_TRANSPORT"
         const match = line.match(/\d+\.\s*([^:]+):\s*(.+)/);
         if (match) {
           const [, key, value] = match;
@@ -46,6 +99,7 @@ const App = () => {
 
       console.log("Parsed entry:", entry);
 
+      // Create new entry with the parsed data
       const newEntry = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
@@ -59,6 +113,7 @@ const App = () => {
         extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
       };
 
+      // Update entries based on message type
       setEntries(prev => {
         if (entry['Mesaj Tipi']?.toLowerCase().includes('cargo_seeking_transport')) {
           return {
@@ -70,55 +125,26 @@ const App = () => {
             ...prev,
             transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
           };
+        } else {
+          console.warn('Unknown message type:', entry['Mesaj Tipi']);
+          alert('Geçersiz mesaj tipi. Lütfen mesajınızı tekrar gönderin.');
+          return prev;
         }
-        return prev;
       });
 
     } catch (error) {
       console.error('Error processing AI response:', error);
       console.error('Raw response was:', response);
+      alert('AI yanıtı işlenirken hata oluştu! Lütfen mesajınızı tekrar gönderin.');
     }
   }, []);
-
-  // WebSocket setup
-  useEffect(() => {
-    if (!ws) return;
-
-    ws.onopen = () => {
-      console.log('Connected to WhatsApp listener');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'new_classification') {
-          processAIResponse(data.data.classification);
-        }
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('Disconnected from WhatsApp listener');
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
-    return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-    };
-  }, [ws, processAIResponse]);
 
   const handleSubmit = async () => {
     if (!inputMessage.trim()) return;
     
     setIsLoading(true);
     try {
+      console.log("Sending request to:", API_URL);
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -132,7 +158,9 @@ const App = () => {
         })
       });
       
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const result = await response.json();
       console.log('Raw API Response:', result);
@@ -145,17 +173,18 @@ const App = () => {
       }
     } catch (error) {
       console.error('API Error:', error);
+      alert('Bağlantı hatası! AI servisine ulaşılamıyor. Lütfen konsolu kontrol edin.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = useCallback((e) => {
+  const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
-  }, [handleSubmit]);
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -163,6 +192,17 @@ const App = () => {
         <h1 className="text-3xl font-bold text-center mb-8">
           Lojistik Mesaj İşlemcisi
         </h1>
+        
+        <div className={`fixed top-4 right-4 px-3 py-1 rounded-full text-sm font-medium ${
+          wsStatus === 'connected' 
+            ? 'bg-green-100 text-green-800' 
+            : wsStatus === 'error' 
+              ? 'bg-red-100 text-red-800'
+              : 'bg-yellow-100 text-yellow-800'
+        }`}>
+          {wsStatus === 'connected' ? 'WhatsApp Bağlı' : 
+           wsStatus === 'error' ? 'Bağlantı Hatası' : 'Bağlanıyor...'}
+        </div>
         
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <textarea
