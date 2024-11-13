@@ -6,42 +6,57 @@ import LogisticsDashboard from './components/LogisticsDashboard';
 const BASE_URL = "https://5c39-34-142-233-221.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
-const STORAGE_KEY = 'logistics_classifications';
-
-const loadStoredEntries = () => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : {
-      cargoSeekingTransport: [],
-      transportSeekingCargo: []
-    };
-  } catch (error) {
-    console.error('Error loading stored entries:', error);
-    return {
-      cargoSeekingTransport: [],
-      transportSeekingCargo: []
-    };
-  }
-};
-
 const App = () => {
-  // 1. Define all state hooks first
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [entries, setEntries] = useState(loadStoredEntries());
-  const [wsStatus, setWsStatus] = useState('disconnected');
-
-  // 2. Define refs after state
-  const ws = useRef(null);
-  const reconnectTimeout = useRef(null);
+  // 1. Constants first
+  const STORAGE_KEY = 'logistics_classifications';
   const maxReconnectDelay = 5000;
 
-  // 3. Define processAIResponse callback before it's used
+  // 2. All useRef declarations
+  const ws = useRef(null);
+  const reconnectTimeout = useRef(null);
+
+  // 3. All useState declarations
+  const [wsStatus, setWsStatus] = useState('disconnected');
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // 4. Initialize entries with stored data
+  const [entries, setEntries] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : {
+        cargoSeekingTransport: [],
+        transportSeekingCargo: []
+      };
+    } catch {
+      return {
+        cargoSeekingTransport: [],
+        transportSeekingCargo: []
+      };
+    }
+  });
+
+  // 5. useCallback functions
+  const saveEntries = useCallback((newEntries) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
+  }, []);
+
+  const deleteEntry = useCallback((id, type) => {
+    setEntries(prev => {
+      const newState = {
+        ...prev,
+        [type]: prev[type].filter(entry => entry.id !== id)
+      };
+      saveEntries(newState);
+      return newState;
+    });
+  }, [saveEntries]);
+
   const processAIResponse = useCallback((response) => {
     try {
       console.log("Processing response:", response);
       
-      // Extract just the numbered list part using regex
+      // Extract classification data
       const listMatch = response.match(/1\.\s*Mesaj Tipi:[\s\S]*?(?=\n\n|$)/);
       if (!listMatch) {
         console.warn('No numbered list found in response');
@@ -49,9 +64,6 @@ const App = () => {
       }
 
       const listText = listMatch[0];
-      console.log("Parsed list text:", listText); // Debug log
-      
-      // Parse each numbered line
       const entry = {};
       const lines = listText.split('\n');
       
@@ -63,9 +75,6 @@ const App = () => {
         }
       });
 
-      console.log("Parsed entry:", entry); // Debug log
-
-      // Create new entry with the parsed data
       const newEntry = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
@@ -79,32 +88,23 @@ const App = () => {
         extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
       };
 
-      console.log("New entry to add:", newEntry); // Debug log
-
-      // Force a state update with new reference
       setEntries(prev => {
         const newState = { ...prev };
-        
         if (entry['Mesaj Tipi']?.toLowerCase().includes('cargo_seeking_transport')) {
           newState.cargoSeekingTransport = [newEntry, ...prev.cargoSeekingTransport];
         } else if (entry['Mesaj Tipi']?.toLowerCase().includes('transport_seeking_cargo')) {
           newState.transportSeekingCargo = [newEntry, ...prev.transportSeekingCargo];
         }
-        
-        console.log("Updated state:", newState); // Debug log
+        saveEntries(newState);
         return newState;
       });
 
-      // Save to localStorage
-      saveEntries(newState);
-
     } catch (error) {
       console.error('Error processing AI response:', error);
-      console.error('Raw response was:', response);
     }
-  }, [saveEntries]); // Empty dependency array since it doesn't depend on any state
+  }, [saveEntries]);
 
-  // 4. Define connectWebSocket after processAIResponse
+  // 6. WebSocket connection logic
   const connectWebSocket = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
 
@@ -120,8 +120,8 @@ const App = () => {
     };
 
     ws.current.onmessage = (event) => {
+      console.log("WebSocket received:", event.data);
       const data = JSON.parse(event.data);
-      console.log("WebSocket received:", data); // Debug log
       
       if (data.type === 'new_classification') {
         console.log("Processing classification:", data.data.classification);
@@ -146,10 +146,9 @@ const App = () => {
     };
   }, [processAIResponse]);
 
-  // 5. Use effects last
+  // 7. useEffect hooks last
   useEffect(() => {
     connectWebSocket();
-
     return () => {
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
@@ -206,27 +205,6 @@ const App = () => {
       handleSubmit();
     }
   };
-
-  // Add function to save entries
-  const saveEntries = useCallback((newEntries) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newEntries));
-    } catch (error) {
-      console.error('Error saving entries:', error);
-    }
-  }, []);
-
-  // Add delete functionality
-  const deleteEntry = useCallback((id, type) => {
-    setEntries(prev => {
-      const newState = {
-        ...prev,
-        [type]: prev[type].filter(entry => entry.id !== id)
-      };
-      saveEntries(newState);
-      return newState;
-    });
-  }, [saveEntries]);
 
   return (
     <div className="min-h-screen bg-gray-100">
