@@ -7,6 +7,7 @@ const BASE_URL = "https://d412-34-142-233-221.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
+  // 1. Define all state hooks first
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [entries, setEntries] = useState({
@@ -14,62 +15,13 @@ const App = () => {
     transportSeekingCargo: []
   });
   const [wsStatus, setWsStatus] = useState('disconnected');
+
+  // 2. Define refs after state
   const ws = useRef(null);
   const reconnectTimeout = useRef(null);
   const maxReconnectDelay = 5000;
 
-  const connectWebSocket = useCallback(() => {
-    if (ws.current?.readyState === WebSocket.OPEN) return;
-
-    ws.current = new WebSocket('ws://localhost:3033');
-
-    ws.current.onopen = () => {
-      console.log('Connected to WhatsApp listener');
-      setWsStatus('connected');
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-        reconnectTimeout.current = null;
-      }
-    };
-
-    ws.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'new_classification') {
-        processAIResponse(data.data.classification);
-      } else if (data.type === 'status') {
-        setWsStatus(data.status);
-      }
-    };
-
-    ws.current.onclose = () => {
-      console.log('Disconnected from WhatsApp listener');
-      setWsStatus('disconnected');
-      reconnectTimeout.current = setTimeout(() => {
-        console.log('Attempting to reconnect...');
-        connectWebSocket();
-      }, Math.random() * maxReconnectDelay);
-    };
-
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setWsStatus('error');
-    };
-  }, [processAIResponse]);
-
-  useEffect(() => {
-    connectWebSocket();
-
-    return () => {
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-      }
-      if (ws.current) {
-        ws.current.close();
-      }
-    };
-  }, [connectWebSocket]);
-
+  // 3. Define processAIResponse callback before it's used
   const processAIResponse = useCallback((response) => {
     try {
       console.log("Processing response:", response);
@@ -137,7 +89,61 @@ const App = () => {
       console.error('Raw response was:', response);
       alert('AI yanıtı işlenirken hata oluştu! Lütfen mesajınızı tekrar gönderin.');
     }
-  }, []);
+  }, []); // Empty dependency array since it doesn't depend on any state
+
+  // 4. Define connectWebSocket after processAIResponse
+  const connectWebSocket = useCallback(() => {
+    if (ws.current?.readyState === WebSocket.OPEN) return;
+
+    ws.current = new WebSocket('ws://localhost:3033');
+
+    ws.current.onopen = () => {
+      console.log('Connected to WhatsApp listener');
+      setWsStatus('connected');
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
+    };
+
+    ws.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'new_classification') {
+        processAIResponse(data.data.classification);
+      } else if (data.type === 'status') {
+        setWsStatus(data.status);
+      }
+    };
+
+    ws.current.onclose = () => {
+      console.log('Disconnected from WhatsApp listener');
+      setWsStatus('disconnected');
+      reconnectTimeout.current = setTimeout(() => {
+        console.log('Attempting to reconnect...');
+        connectWebSocket();
+      }, Math.random() * maxReconnectDelay);
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setWsStatus('error');
+    };
+  }, [processAIResponse]);
+
+  // 5. Use effects last
+  useEffect(() => {
+    connectWebSocket();
+
+    return () => {
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
+      if (ws.current) {
+        ws.current.close();
+      }
+    };
+  }, [connectWebSocket]);
 
   const handleSubmit = async () => {
     if (!inputMessage.trim()) return;
