@@ -117,25 +117,40 @@ const App = () => {
     ws.current = new WebSocket('ws://localhost:3033');
 
     ws.current.onopen = () => {
-        console.log('WebSocket connection established');
+        console.log('WebSocket Connected');
         setWsStatus('connected');
-        if (reconnectTimeout.current) {
-            clearTimeout(reconnectTimeout.current);
-            reconnectTimeout.current = null;
-        }
     };
 
     ws.current.onmessage = (event) => {
         console.log('Received WebSocket message:', event.data);
         try {
             const data = JSON.parse(event.data);
-            console.log('Parsed data:', data);
             
-            if (data.type === 'new_classification') {
-                console.log('Processing new classification:', data.data);
-                processAIResponse(data.data.classification);
-            } else if (data.type === 'status') {
-                setWsStatus(data.status);
+            if (data.type === 'new_classification' && data.data?.classification) {
+                const lines = data.data.classification.split('\n');
+                const entry = {
+                    id: Date.now(),
+                    timestamp: data.data.timestamp,
+                    messageType: lines.find(l => l.includes('Mesaj Tipi'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    loadingLocation: lines.find(l => l.includes('Yükleme Yeri'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    unloadingLocation: lines.find(l => l.includes('İndirme Yeri'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    cargoType: lines.find(l => l.includes('Yük Tipi'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    vehicleType: lines.find(l => l.includes('Araç Tipi'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    amount: lines.find(l => l.includes('Tonaj/Miktar'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    contact: lines.find(l => l.includes('İletişim'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ',
+                    extraInfo: lines.find(l => l.includes('Ekstra Bilgi'))?.split(': ')[1]?.trim() || 'BELİRTİLMEMİŞ'
+                };
+
+                setEntries(prev => {
+                    const newState = { ...prev };
+                    if (entry.messageType.includes('CARGO_SEEKING_TRANSPORT')) {
+                        newState.cargoSeekingTransport = [entry, ...prev.cargoSeekingTransport];
+                    } else if (entry.messageType.includes('TRANSPORT_SEEKING_CARGO')) {
+                        newState.transportSeekingCargo = [entry, ...prev.transportSeekingCargo];
+                    }
+                    saveEntries(newState);
+                    return newState;
+                });
             }
         } catch (error) {
             console.error('Error processing WebSocket message:', error);
@@ -143,27 +158,16 @@ const App = () => {
     };
 
     ws.current.onclose = () => {
-      console.log('Disconnected from WhatsApp listener');
-      setWsStatus('disconnected');
-      reconnectTimeout.current = setTimeout(() => {
-        console.log('Attempting to reconnect...');
-        connectWebSocket();
-      }, Math.random() * maxReconnectDelay);
+        console.log('WebSocket Disconnected');
+        setWsStatus('disconnected');
+        // Attempt to reconnect after a delay
+        setTimeout(connectWebSocket, 3000);
     };
+  }, [saveEntries]);
 
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setWsStatus('error');
-    };
-  }, [processAIResponse]);
-
-  // 7. useEffect hooks last
   useEffect(() => {
     connectWebSocket();
     return () => {
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-      }
       if (ws.current) {
         ws.current.close();
       }
