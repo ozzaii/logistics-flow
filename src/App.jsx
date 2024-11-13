@@ -30,18 +30,17 @@ const App = () => {
       const listMatch = response.match(/1\.\s*Mesaj Tipi:[\s\S]*?(?=\n\n|$)/);
       if (!listMatch) {
         console.warn('No numbered list found in response');
-        alert('AI yanıtı analiz edilemedi. Lütfen mesajınızı tekrar gönderin.');
         return;
       }
 
       const listText = listMatch[0];
+      console.log("Parsed list text:", listText); // Debug log
       
       // Parse each numbered line
       const entry = {};
       const lines = listText.split('\n');
       
       lines.forEach(line => {
-        // Match lines like "1. Mesaj Tipi: CARGO_SEEKING_TRANSPORT"
         const match = line.match(/\d+\.\s*([^:]+):\s*(.+)/);
         if (match) {
           const [, key, value] = match;
@@ -49,7 +48,7 @@ const App = () => {
         }
       });
 
-      console.log("Parsed entry:", entry);
+      console.log("Parsed entry:", entry); // Debug log
 
       // Create new entry with the parsed data
       const newEntry = {
@@ -65,29 +64,25 @@ const App = () => {
         extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
       };
 
-      // Update entries based on message type
+      console.log("New entry to add:", newEntry); // Debug log
+
+      // Force a state update with new reference
       setEntries(prev => {
+        const newState = { ...prev };
+        
         if (entry['Mesaj Tipi']?.toLowerCase().includes('cargo_seeking_transport')) {
-          return {
-            ...prev,
-            cargoSeekingTransport: [newEntry, ...prev.cargoSeekingTransport]
-          };
+          newState.cargoSeekingTransport = [newEntry, ...prev.cargoSeekingTransport];
         } else if (entry['Mesaj Tipi']?.toLowerCase().includes('transport_seeking_cargo')) {
-          return {
-            ...prev,
-            transportSeekingCargo: [newEntry, ...prev.transportSeekingCargo]
-          };
-        } else {
-          console.warn('Unknown message type:', entry['Mesaj Tipi']);
-          alert('Geçersiz mesaj tipi. Lütfen mesajınızı tekrar gönderin.');
-          return prev;
+          newState.transportSeekingCargo = [newEntry, ...prev.transportSeekingCargo];
         }
+        
+        console.log("Updated state:", newState); // Debug log
+        return newState;
       });
 
     } catch (error) {
       console.error('Error processing AI response:', error);
       console.error('Raw response was:', response);
-      alert('AI yanıtı işlenirken hata oluştu! Lütfen mesajınızı tekrar gönderin.');
     }
   }, []); // Empty dependency array since it doesn't depend on any state
 
@@ -108,8 +103,10 @@ const App = () => {
 
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log("WebSocket received:", data); // Debug log
       
       if (data.type === 'new_classification') {
+        console.log("Processing classification:", data.data.classification);
         processAIResponse(data.data.classification);
       } else if (data.type === 'status') {
         setWsStatus(data.status);
