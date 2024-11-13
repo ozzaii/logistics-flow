@@ -21,7 +21,7 @@ const App = () => {
   const connectWebSocket = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
 
-    ws.current = new WebSocket('ws://localhost:3032');
+    ws.current = new WebSocket('ws://localhost:3033');
 
     ws.current.onopen = () => {
       console.log('Connected to WhatsApp listener');
