@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://f6d5-34-142-233-221.ngrok-free.app";
+const BASE_URL = "https://e16a-34-87-168-30.ngrok-free.app";
 const API_URL = `${BASE_URL}/predict`;
 
 const App = () => {
@@ -54,53 +54,58 @@ const App = () => {
 
   const processAIResponse = useCallback((response) => {
     try {
-      console.log("Processing response:", response);
-      
-      // Extract classification data
-      const listMatch = response.match(/1\.\s*Mesaj Tipi:[\s\S]*?(?=\n\n|$)/);
-      if (!listMatch) {
-        console.warn('No numbered list found in response');
-        return;
-      }
-
-      const listText = listMatch[0];
-      const entry = {};
-      const lines = listText.split('\n');
-      
-      lines.forEach(line => {
-        const match = line.match(/\d+\.\s*([^:]+):\s*(.+)/);
-        if (match) {
-          const [, key, value] = match;
-          entry[key.trim()] = value.trim();
+        console.log("Processing AI response:", response);
+        
+        // Extract just the numbered list part
+        const listMatch = response.match(/1\.\s*Mesaj Tipi:[\s\S]*?(?=\n\n|$)/);
+        if (!listMatch) {
+            console.warn('No numbered list found in response');
+            return;
         }
-      });
 
-      const newEntry = {
-        id: Date.now(),
-        timestamp: new Date().toISOString(),
-        messageType: entry['Mesaj Tipi'] || 'BELİRTİLMEMİŞ',
-        loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
-        unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
-        cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
-        vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
-        amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
-        contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
-        extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
-      };
+        const listText = listMatch[0];
+        console.log("Parsed list text:", listText);
+        
+        const entry = {};
+        const lines = listText.split('\n');
+        
+        lines.forEach(line => {
+            const match = line.match(/\d+\.\s*([^:]+):\s*(.+)/);
+            if (match) {
+                const [, key, value] = match;
+                entry[key.trim()] = value.trim();
+            }
+        });
 
-      setEntries(prev => {
-        const newState = { ...prev };
-        if (entry['Mesaj Tipi']?.toLowerCase().includes('cargo_seeking_transport')) {
-          newState.cargoSeekingTransport = [newEntry, ...prev.cargoSeekingTransport];
-        } else if (entry['Mesaj Tipi']?.toLowerCase().includes('transport_seeking_cargo')) {
-          newState.transportSeekingCargo = [newEntry, ...prev.transportSeekingCargo];
-        }
-        saveEntries(newState);
-        return newState;
-      });
+        console.log("Parsed entry:", entry);
+
+        const newEntry = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            messageType: entry['Mesaj Tipi'] || 'BELİRTİLMEMİŞ',
+            loadingLocation: entry['Yükleme Yeri'] || 'BELİRTİLMEMİŞ',
+            unloadingLocation: entry['İndirme Yeri/Yerleri'] || 'BELİRTİLMEMİŞ',
+            cargoType: entry['Yük Tipi'] || 'BELİRTİLMEMİŞ',
+            vehicleType: entry['Araç Tipi'] || 'BELİRTİLMEMİŞ',
+            amount: entry['Tonaj/Miktar'] || 'BELİRTİLMEMİŞ',
+            contact: entry['İletişim'] || 'BELİRTİLMEMİŞ',
+            extraInfo: entry['Ekstra Bilgi'] || 'BELİRTİLMEMİŞ'
+        };
+
+        setEntries(prev => {
+            const newState = { ...prev };
+            if (entry['Mesaj Tipi']?.toLowerCase().includes('cargo_seeking_transport')) {
+                newState.cargoSeekingTransport = [newEntry, ...prev.cargoSeekingTransport];
+            } else if (entry['Mesaj Tipi']?.toLowerCase().includes('transport_seeking_cargo')) {
+                newState.transportSeekingCargo = [newEntry, ...prev.transportSeekingCargo];
+            }
+            saveEntries(newState);
+            return newState;
+        });
 
     } catch (error) {
-      console.error('Error processing AI response:', error);
+        console.error('Error processing AI response:', error);
+        console.error('Raw response was:', response);
     }
   }, [saveEntries]);
 
@@ -108,27 +113,33 @@ const App = () => {
   const connectWebSocket = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN) return;
 
+    console.log('Attempting to connect to WebSocket...');
     ws.current = new WebSocket('ws://localhost:3033');
 
     ws.current.onopen = () => {
-      console.log('Connected to WhatsApp listener');
-      setWsStatus('connected');
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-        reconnectTimeout.current = null;
-      }
+        console.log('WebSocket connection established');
+        setWsStatus('connected');
+        if (reconnectTimeout.current) {
+            clearTimeout(reconnectTimeout.current);
+            reconnectTimeout.current = null;
+        }
     };
 
     ws.current.onmessage = (event) => {
-      console.log("WebSocket received:", event.data);
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'new_classification') {
-        console.log("Processing classification:", data.data.classification);
-        processAIResponse(data.data.classification);
-      } else if (data.type === 'status') {
-        setWsStatus(data.status);
-      }
+        console.log('Received WebSocket message:', event.data);
+        try {
+            const data = JSON.parse(event.data);
+            console.log('Parsed data:', data);
+            
+            if (data.type === 'new_classification') {
+                console.log('Processing new classification:', data.data);
+                processAIResponse(data.data.classification);
+            } else if (data.type === 'status') {
+                setWsStatus(data.status);
+            }
+        } catch (error) {
+            console.error('Error processing WebSocket message:', error);
+        }
     };
 
     ws.current.onclose = () => {
