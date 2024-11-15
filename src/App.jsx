@@ -22,20 +22,38 @@ const App = () => {
     const connectWebSocket = () => {
       if (ws.current?.readyState === WebSocket.OPEN) return;
 
+      console.log('Attempting WebSocket connection...');
+      
       ws.current = new WebSocket(WS_URL);
       
-      ws.current.onclose = () => {
-        console.log('WebSocket Disconnected');
+      ws.current.onopen = () => {
+        console.log('WebSocket Connected Successfully');
+        setWsConnected(true);
+        reconnectAttempts.current = 0;
+        
+        // Send heartbeat every 30 seconds
+        const heartbeat = setInterval(() => {
+          if (ws.current?.readyState === WebSocket.OPEN) {
+            ws.current.send('ping');
+          }
+        }, 30000);
+        
+        return () => clearInterval(heartbeat);
+      };
+
+      ws.current.onclose = (event) => {
+        console.log('WebSocket Disconnected:', event.code, event.reason);
         setWsConnected(false);
-        // Exponential backoff for reconnection
-        setTimeout(connectWebSocket, Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000));
+        
+        // Attempt to reconnect with exponential backoff
+        const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
+        console.log(`Reconnecting in ${timeout/1000} seconds...`);
+        setTimeout(connectWebSocket, timeout);
         reconnectAttempts.current++;
       };
 
-      ws.current.onopen = () => {
-        console.log('WebSocket Connected');
-        setWsConnected(true);
-        reconnectAttempts.current = 0;
+      ws.current.onerror = (error) => {
+        console.error('WebSocket Error:', error);
       };
     };
 
