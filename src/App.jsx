@@ -20,6 +20,7 @@ const App = () => {
   const [wsConnected, setWsConnected] = useState(false);
   const ws = useRef(null);
   const reconnectAttempts = useRef(0);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   useEffect(() => {
     const connectWebSocket = () => {
@@ -209,6 +210,19 @@ const App = () => {
     localStorage.setItem('logisticsEntries', JSON.stringify(entries));
   }, [entries]);
 
+  const handleReset = () => {
+    setShowConfirmReset(true);
+  };
+
+  const confirmReset = () => {
+    setEntries({
+      cargoSeekingTransport: [],
+      transportSeekingCargo: []
+    });
+    localStorage.removeItem('logisticsEntries');
+    setShowConfirmReset(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="container mx-auto p-4 max-w-6xl">
@@ -219,7 +233,40 @@ const App = () => {
           <p className="text-gray-600 max-w-2xl mx-auto">
             Lojistik mesajlarınızı yapay zeka destekli sistemimizle analiz edin ve organize edin.
           </p>
+          <button
+            onClick={handleReset}
+            className="mt-4 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200"
+          >
+            Sayfayı Temizle
+          </button>
         </header>
+        
+        {showConfirmReset && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+              <h3 className="text-lg font-semibold mb-4">
+                Sayfayı Temizle
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Tüm kayıtlar silinecek. Emin misiniz?
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowConfirmReset(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={confirmReset}
+                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg"
+                >
+                  Evet, Temizle
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <div className="relative">
