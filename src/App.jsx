@@ -30,6 +30,60 @@ const App = () => {
   const lastPongReceived = useRef(Date.now());
   const healthCheckInterval = useRef(null);
 
+  const processAIResponse = useCallback((response) => {
+    try {
+      console.log('Processing response:', response);
+      
+      const classificationText = response.classification
+        .replace(/\*\*Cevap:\*\*\n+/g, '')
+        .replace(/\*\*/g, '')
+        .trim();
+      
+      const lines = classificationText.split('\n')
+        .filter(line => line.trim())
+        .map(line => {
+          const cleanLine = line.replace(/^\d+\.\s*/, '').trim();
+          const [key, ...valueParts] = cleanLine.split(/:(.*)/s);
+          const value = valueParts.join('').trim();
+          return { key: key.trim(), value };
+        });
+
+      const entry = {
+        id: Date.now(),
+        timestamp: response.timestamp,
+        messageType: lines.find(l => l.key === 'Mesaj Tipi')?.value || 'BELİRTİLMEMİŞ',
+        loadingLocation: lines.find(l => l.key === 'Yükleme Yeri veya Yerleri')?.value || 'BELİRTİLMEMİŞ',
+        unloadingLocation: lines.find(l => l.key === 'İndirme Yeri veya Yerleri')?.value || 'BELİRTİLMEMİŞ',
+        cargoType: lines.find(l => l.key === 'Yük Tipi')?.value || 'BELİRTİLMEMİŞ',
+        vehicleType: lines.find(l => l.key === 'Araç Tipi')?.value || 'BELİRTİLMEMİŞ',
+        amount: lines.find(l => l.key === 'Tonaj/Miktar')?.value || 'BELİRTİLMEMİŞ',
+        price: lines.find(l => l.key === 'Fiyat Bilgisi')?.value || 'BELİRTİLMEMİŞ',
+        date: lines.find(l => l.key === 'Tarih')?.value || 'BELİRTİLMEMİŞ',
+        contact: lines.find(l => l.key === 'İletişim')?.value || 'BELİRTİLMEMİŞ',
+        extraInfo: lines.find(l => l.key === 'Ekstra Bilgi')?.value || 'BELİRTİLMEMİŞ'
+      };
+
+      setEntries(prevEntries => {
+        const messageType = lines.find(l => l.key === 'Mesaj Tipi')?.value;
+        if (messageType === 'CARGO_SEEKING_TRANSPORT') {
+          return {
+            ...prevEntries,
+            cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
+          };
+        } else if (messageType === 'TRANSPORT_SEEKING_CARGO') {
+          return {
+            ...prevEntries,
+            transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
+          };
+        }
+        return prevEntries;
+      });
+
+    } catch (error) {
+      console.error('Error processing AI response:', error);
+    }
+  }, []);
+
   const connectWebSocket = useCallback(() => {
     if (reconnectAttempts.current >= maxReconnectAttempts) {
       setWsStatus('failed');
@@ -123,73 +177,6 @@ const App = () => {
         clearInterval(healthCheckInterval.current);
       }
     };
-  }, []);
-
-  const processAIResponse = useCallback((response) => {
-    try {
-      console.log('Processing response:', response);
-      
-      // Get the classification text and clean it up
-      const classificationText = response.classification
-        .replace(/\*\*Cevap:\*\*\n+/g, '')  // Remove the "Cevap:" header
-        .replace(/\*\*/g, '')                // Remove all remaining asterisks
-        .trim();
-      
-      // Split into lines and process each line
-      const lines = classificationText.split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          // Remove the number prefix and clean up
-          const cleanLine = line.replace(/^\d+\.\s*/, '').trim();
-          // Split only on the first colon
-          const [key, ...valueParts] = cleanLine.split(/:(.*)/s);
-          const value = valueParts.join('').trim();
-          return { key: key.trim(), value };
-        });
-
-      console.log('Parsed lines:', lines); // Debug log
-
-      const entry = {
-        id: Date.now(),
-        timestamp: response.timestamp,
-        messageType: lines.find(l => l.key === 'Mesaj Tipi')?.value || 'BELİRTİLMEMİŞ',
-        loadingLocation: lines.find(l => l.key === 'Yükleme Yeri veya Yerleri')?.value || 'BELİRTİLMEMİŞ',
-        unloadingLocation: lines.find(l => l.key === 'İndirme Yeri veya Yerleri')?.value || 'BELİRTİLMEMİŞ',
-        cargoType: lines.find(l => l.key === 'Yük Tipi')?.value || 'BELİRTİLMEMİŞ',
-        vehicleType: lines.find(l => l.key === 'Araç Tipi')?.value || 'BELİRTİLMEMİŞ',
-        amount: lines.find(l => l.key === 'Tonaj/Miktar')?.value || 'BELİRTİLMEMİŞ',
-        price: lines.find(l => l.key === 'Fiyat Bilgisi')?.value || 'BELİRTİLMEMİŞ',
-        date: lines.find(l => l.key === 'Tarih')?.value || 'BELİRTİLMEMİŞ',
-        contact: lines.find(l => l.key === 'İletişim')?.value || 'BELİRTİLMEMİŞ',
-        extraInfo: lines.find(l => l.key === 'Ekstra Bilgi')?.value || 'BELİRTİLMEMİŞ'
-      };
-
-      console.log('Created entry:', entry);
-
-      // Update appropriate list based on message type
-      setEntries(prevEntries => {
-        const messageType = lines.find(l => l.key === 'Mesaj Tipi')?.value;
-        if (messageType === 'CARGO_SEEKING_TRANSPORT') {
-          const newEntries = {
-            ...prevEntries,
-            cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
-          };
-          console.log('Updated entries:', newEntries);
-          return newEntries;
-        } else if (messageType === 'TRANSPORT_SEEKING_CARGO') {
-          const newEntries = {
-            ...prevEntries,
-            transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
-          };
-          console.log('Updated entries:', newEntries);
-          return newEntries;
-        }
-        return prevEntries;
-      });
-
-    } catch (error) {
-      console.error('Error processing AI response:', error);
-    }
   }, []);
 
   const handleSubmit = async () => {
