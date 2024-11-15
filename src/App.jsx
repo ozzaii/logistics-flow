@@ -85,9 +85,7 @@ const App = () => {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      return;
-    }
+    if (ws.current?.readyState === WebSocket.OPEN) return;
 
     const socket = new WebSocket(WS_URL);
     
@@ -103,28 +101,23 @@ const App = () => {
           processAIResponse(data.data);
         }
       } catch (error) {
-        console.error('Error processing WebSocket message:', error);
+        console.error('Error processing message:', error);
       }
     });
 
     socket.addEventListener('close', () => {
       setWsStatus('disconnected');
-      setTimeout(() => connectWebSocket(), 1000);
+      setTimeout(connectWebSocket, 1000);
     });
 
     ws.current = socket;
   }, [processAIResponse]);
 
-  // Simplified heartbeat
+  // Just connect on component mount
   useEffect(() => {
-    const heartbeat = setInterval(() => {
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 30000);
-
-    return () => clearInterval(heartbeat);
-  }, []);
+    connectWebSocket();
+    return () => ws.current?.close();
+  }, [connectWebSocket]);
 
   const handleSubmit = async () => {
     if (!inputMessage.trim()) return;
