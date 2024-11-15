@@ -90,47 +90,66 @@ const App = () => {
       return;
     }
 
-    const socket = new WebSocket(WS_URL);
-    socket.binaryType = 'blob';
+    try {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        console.log('WebSocket already connected');
+        return;
+      }
 
-    socket.addEventListener('open', () => {
-      console.log('WebSocket Connected Successfully');
-      reconnectAttempts.current = 0;
-      setWsStatus('connected');
-      socket.send(JSON.stringify({ type: 'ping' }));
-    });
+      const socket = new WebSocket(WS_URL);
+      socket.binaryType = 'blob';
 
-    socket.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'pong') {
-          lastPongReceived.current = Date.now();
-        } else if (data.type === 'new_classification') {
-          processAIResponse(data.data);
+      socket.addEventListener('open', () => {
+        console.log('WebSocket Connected Successfully');
+        reconnectAttempts.current = 0;
+        setWsStatus('connected');
+        // Initial ping
+        socket.send(JSON.stringify({ type: 'ping' }));
+      });
+
+      socket.addEventListener('message', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'pong') {
+            lastPongReceived.current = Date.now();
+          } else if (data.type === 'new_classification') {
+            processAIResponse(data.data);
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
         }
-      } catch (error) {
-        console.error('Error processing WebSocket message:', error);
-      }
-    });
+      });
 
-    socket.addEventListener('close', (event) => {
+      socket.addEventListener('close', (event) => {
+        if (wsStatus === 'disconnected') return; // Prevent multiple reconnection attempts
+        
+        setWsStatus('disconnected');
+        if (reconnectTimeout.current) {
+          clearTimeout(reconnectTimeout.current);
+        }
+
+        const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
+        console.log(`Attempting to reconnect in ${backoffTime/1000} seconds...`);
+        
+        reconnectTimeout.current = setTimeout(() => {
+          reconnectAttempts.current++;
+          connectWebSocket();
+        }, backoffTime);
+      });
+
+      socket.addEventListener('error', (error) => {
+        console.error('WebSocket error:', error);
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
+      });
+
+      ws.current = socket;
+    } catch (error) {
+      console.error('Error creating WebSocket:', error);
       setWsStatus('disconnected');
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-      }
-      const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-      reconnectTimeout.current = setTimeout(() => {
-        reconnectAttempts.current++;
-        connectWebSocket();
-      }, backoffTime);
-    });
-
-    socket.addEventListener('error', () => {
-      socket?.close();
-    });
-
-    ws.current = socket;
-  }, [processAIResponse]);
+    }
+  }, [wsStatus, processAIResponse]);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -138,11 +157,14 @@ const App = () => {
 
     // Cleanup function
     return () => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.close();
+      }
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
-      if (ws.current) {
-        ws.current.close();
+      if (healthCheckInterval.current) {
+        clearInterval(healthCheckInterval.current);
       }
     };
   }, [connectWebSocket]);
