@@ -151,14 +151,56 @@ const App = () => {
     }
   }, [wsStatus, processAIResponse]);
 
-  // Initialize WebSocket connection
+  // Add this useEffect for WebSocket initialization and cleanup
   useEffect(() => {
-    connectWebSocket();
+    const initWebSocket = () => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        console.log('WebSocket already connected');
+        return;
+      }
+
+      const socket = new WebSocket(WS_URL);
+      socket.binaryType = 'blob';
+
+      socket.addEventListener('open', () => {
+        console.log('WebSocket Connected Successfully');
+        reconnectAttempts.current = 0;
+        setWsStatus('connected');
+        socket.send(JSON.stringify({ type: 'ping' }));
+      });
+
+      socket.addEventListener('message', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'pong') {
+            lastPongReceived.current = Date.now();
+          } else if (data.type === 'new_classification') {
+            processAIResponse(data.data);
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      });
+
+      socket.addEventListener('close', () => {
+        if (wsStatus === 'disconnected') return;
+        setWsStatus('disconnected');
+      });
+
+      socket.addEventListener('error', () => {
+        socket?.close();
+      });
+
+      ws.current = socket;
+    };
+
+    initWebSocket();
 
     // Cleanup function
     return () => {
-      if (ws.current?.readyState === WebSocket.OPEN) {
+      if (ws.current) {
         ws.current.close();
+        ws.current = null;
       }
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
@@ -167,7 +209,20 @@ const App = () => {
         clearInterval(healthCheckInterval.current);
       }
     };
-  }, [connectWebSocket]);
+  }, []); // Empty dependency array to run only once on mount
+
+  // Separate useEffect for reconnection logic
+  useEffect(() => {
+    if (wsStatus === 'disconnected' && reconnectAttempts.current < maxReconnectAttempts) {
+      const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
+      console.log(`Attempting to reconnect in ${backoffTime/1000} seconds...`);
+      
+      reconnectTimeout.current = setTimeout(() => {
+        reconnectAttempts.current++;
+        connectWebSocket();
+      }, backoffTime);
+    }
+  }, [wsStatus]);
 
   // Add heartbeat to keep connection alive
   useEffect(() => {
