@@ -85,18 +85,24 @@ const App = () => {
     try {
       console.log('Processing response:', response);
       
-      // Get the classification text
-      const classificationText = response.classification;
+      // Get the classification text and remove markdown formatting
+      const classificationText = response.classification.replace(/\*\*/g, '');
       
-      // Split into lines and filter empty ones
+      // Create an object to store the parsed values
+      const parsedData = {};
+      
+      // Split into lines and process each line
       const lines = classificationText.split('\n')
-        .filter(line => line.trim())
-        .map(line => line.replace(/^\d+\.\s*\*\*|\*\*:\s*/, ''))
+        .filter(line => line.trim() && line.includes(':'))
         .map(line => {
-          const [key, value] = line.split(':').map(s => s.trim());
-          return { key, value };
+          // Remove numbers and clean up the line
+          const cleanLine = line.replace(/^\d+\.\s*/, '').trim();
+          const [key, ...valueParts] = cleanLine.split(':');
+          const value = valueParts.join(':').trim();
+          return { key: key.trim(), value };
         });
 
+      // Map the parsed lines to our entry structure
       const entry = {
         id: Date.now(),
         timestamp: response.timestamp,
@@ -108,25 +114,30 @@ const App = () => {
         amount: lines.find(l => l.key === 'Tonaj/Miktar')?.value || 'BELİRTİLMEMİŞ',
         price: lines.find(l => l.key === 'Fiyat Bilgisi')?.value || 'BELİRTİLMEMİŞ',
         date: lines.find(l => l.key === 'Tarih')?.value || 'BELİRTİLMEMİŞ',
-        contact: lines.find(l => l.key === 'İletişim')?.value || 'BELİRTİLMEMİŞ',
+        contact: lines.find(l => l.key === 'İletişim')?.value?.replace(/☎️/g, '') || 'BELİRTİLMEMİŞ',
         extraInfo: lines.find(l => l.key === 'Ekstra Bilgi')?.value || 'BELİRTİLMEMİŞ'
       };
 
       console.log('Created entry:', entry);
 
+      // Update appropriate list based on message type
       setEntries(prevEntries => {
-        const newEntries = entry.messageType === 'CARGO_SEEKING_TRANSPORT'
-          ? {
-              ...prevEntries,
-              cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
-            }
-          : {
-              ...prevEntries,
-              transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
-            };
-        
-        console.log('Updated entries:', newEntries);
-        return newEntries;
+        if (entry.messageType === 'CARGO_SEEKING_TRANSPORT') {
+          const newEntries = {
+            ...prevEntries,
+            cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
+          };
+          console.log('Updated entries:', newEntries);
+          return newEntries;
+        } else if (entry.messageType === 'TRANSPORT_SEEKING_CARGO') {
+          const newEntries = {
+            ...prevEntries,
+            transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
+          };
+          console.log('Updated entries:', newEntries);
+          return newEntries;
+        }
+        return prevEntries;
       });
 
     } catch (error) {
