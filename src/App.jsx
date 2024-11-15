@@ -13,9 +13,12 @@ const WS_URL = `wss://ozai.ngrok.app/ws`;
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [entries, setEntries] = useState({
-    cargoSeekingTransport: [],
-    transportSeekingCargo: []
+  const [entries, setEntries] = useState(() => {
+    const saved = localStorage.getItem('logisticsEntries');
+    return saved ? JSON.parse(saved) : {
+      cargoSeekingTransport: [],
+      transportSeekingCargo: []
+    };
   });
   const [wsConnected, setWsConnected] = useState(false);
   const ws = useRef(null);
