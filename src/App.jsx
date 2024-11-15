@@ -117,18 +117,24 @@ const App = () => {
         extraInfo: lines.find(l => l.key === 'Ekstra Bilgi')?.value || 'BELİRTİLMEMİŞ'
       };
 
+      console.log('Created entry:', entry);
+
       // Update appropriate list based on message type
       setEntries(prevEntries => {
         if (entry.messageType === 'CARGO_SEEKING_TRANSPORT') {
-          return {
+          const newEntries = {
             ...prevEntries,
             cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
           };
+          console.log('Updated entries:', newEntries);
+          return newEntries;
         } else if (entry.messageType === 'TRANSPORT_SEEKING_CARGO') {
-          return {
+          const newEntries = {
             ...prevEntries,
             transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
           };
+          console.log('Updated entries:', newEntries);
+          return newEntries;
         }
         return prevEntries;
       });
