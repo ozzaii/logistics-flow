@@ -83,15 +83,8 @@ const App = () => {
 
   const processAIResponse = useCallback((response) => {
     try {
-      // Add validation for response format
-      if (!response?.classification) {
-        console.error('Invalid response format:', response);
-        return;
-      }
-
-      // Add logging for debugging
-      console.log('Processing classification:', response.classification);
-
+      console.log('Processing response:', response);
+      
       // Get the classification text
       const classificationText = response.classification;
       
@@ -104,7 +97,6 @@ const App = () => {
           return { key, value };
         });
 
-      // Create entry object
       const entry = {
         id: Date.now(),
         timestamp: response.timestamp,
@@ -122,24 +114,19 @@ const App = () => {
 
       console.log('Created entry:', entry);
 
-      // Update appropriate list based on message type
       setEntries(prevEntries => {
-        if (entry.messageType === 'CARGO_SEEKING_TRANSPORT') {
-          const newEntries = {
-            ...prevEntries,
-            cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
-          };
-          console.log('Updated entries:', newEntries);
-          return newEntries;
-        } else if (entry.messageType === 'TRANSPORT_SEEKING_CARGO') {
-          const newEntries = {
-            ...prevEntries,
-            transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
-          };
-          console.log('Updated entries:', newEntries);
-          return newEntries;
-        }
-        return prevEntries;
+        const newEntries = entry.messageType === 'CARGO_SEEKING_TRANSPORT'
+          ? {
+              ...prevEntries,
+              cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
+            }
+          : {
+              ...prevEntries,
+              transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
+            };
+        
+        console.log('Updated entries:', newEntries);
+        return newEntries;
       });
 
     } catch (error) {
