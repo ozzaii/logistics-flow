@@ -22,7 +22,7 @@ const App = () => {
     const connectWebSocket = () => {
       if (ws.current?.readyState === WebSocket.OPEN) return;
 
-      console.log('Attempting WebSocket connection...');
+      console.log('Attempting WebSocket connection to:', WS_URL);
       
       ws.current = new WebSocket(WS_URL);
       
@@ -39,6 +39,18 @@ const App = () => {
         }, 30000);
         
         return () => clearInterval(heartbeat);
+      };
+
+      ws.current.onmessage = (event) => {
+        console.log('Received WebSocket message:', event.data);
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_classification') {
+            processAIResponse(data.data);
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
       };
 
       ws.current.onclose = (event) => {
