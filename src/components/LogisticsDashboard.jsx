@@ -120,7 +120,8 @@ const EntryCard = ({ entry }) => {
 };
 
 const LogisticsDashboard = ({ cargoSeekingTransport, transportSeekingCargo, isLoading }) => {
-    if (isLoading) {
+  console.log('Dashboard received:', { cargoSeekingTransport, transportSeekingCargo }); // Add this debug log
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Loading skeleton */}
