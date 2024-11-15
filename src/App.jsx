@@ -8,7 +8,7 @@ const BASE_URL = window.location.hostname === 'localhost'
   : "https://ozai.ngrok.app";
 
 const API_URL = `${BASE_URL}/predict`;
-const WS_URL = `wss://ozai.ngrok.app/ws`;
+const WS_URL = 'wss://ozai.ngrok.app/ws';
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
@@ -27,58 +27,55 @@ const App = () => {
   const reconnectTimeout = useRef(null);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [wsStatus, setWsStatus] = useState('connecting');
+  const lastPongReceived = useRef(Date.now());
+  const healthCheckInterval = useRef(null);
 
   const connectWebSocket = useCallback(() => {
     if (reconnectAttempts.current >= maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+      setWsStatus('failed');
       return;
     }
 
-    const wsUrl = 'wss://ozai.ngrok.app/ws';
-    console.log('Attempting WebSocket connection to:', wsUrl);
+    const socket = new WebSocket(WS_URL);
+    socket.binaryType = 'blob';
 
-    ws.current = new WebSocket(wsUrl);
-
-    ws.current.onopen = () => {
+    socket.addEventListener('open', () => {
       console.log('WebSocket Connected Successfully');
       reconnectAttempts.current = 0;
       setWsStatus('connected');
-    };
+      socket.send(JSON.stringify({ type: 'ping' }));
+    });
 
-    ws.current.onmessage = (event) => {
-      console.log('Received WebSocket message:', event.data);
+    socket.addEventListener('message', (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'new_classification') {
+        if (data.type === 'pong') {
+          lastPongReceived.current = Date.now();
+        } else if (data.type === 'new_classification') {
           processAIResponse(data.data);
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
       }
-    };
+    });
 
-    ws.current.onclose = (event) => {
-      console.log('WebSocket Connection Closed:', event.code, event.reason);
-      
-      // Clear any existing reconnect timeout
+    socket.addEventListener('close', (event) => {
+      setWsStatus('disconnected');
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }
-
-      // Attempt to reconnect with exponential backoff
       const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-      console.log(`Attempting to reconnect in ${backoffTime/1000} seconds...`);
-      
       reconnectTimeout.current = setTimeout(() => {
         reconnectAttempts.current++;
         connectWebSocket();
       }, backoffTime);
-      setWsStatus('disconnected');
-    };
+    });
 
-    ws.current.onerror = (error) => {
-      console.error('WebSocket Error:', error);
-    };
+    socket.addEventListener('error', () => {
+      socket?.close();
+    });
+
+    ws.current = socket;
   }, [processAIResponse]);
 
   // Initialize WebSocket connection
@@ -105,6 +102,27 @@ const App = () => {
     }, 30000); // Send heartbeat every 30 seconds
 
     return () => clearInterval(heartbeat);
+  }, []);
+
+  // Add this effect for health checking
+  useEffect(() => {
+    healthCheckInterval.current = setInterval(() => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        // Check if we haven't received a pong in more than 30 seconds
+        if (Date.now() - lastPongReceived.current > 30000) {
+          console.log('No pong received in 30s, reconnecting...');
+          ws.current.close();
+        } else {
+          ws.current.send(JSON.stringify({ type: 'ping' }));
+        }
+      }
+    }, 15000); // Check every 15 seconds
+
+    return () => {
+      if (healthCheckInterval.current) {
+        clearInterval(healthCheckInterval.current);
+      }
+    };
   }, []);
 
   const processAIResponse = useCallback((response) => {
