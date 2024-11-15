@@ -23,66 +23,88 @@ const App = () => {
   const [wsConnected, setWsConnected] = useState(false);
   const ws = useRef(null);
   const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
+  const reconnectTimeout = useRef(null);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [wsStatus, setWsStatus] = useState('connecting');
 
-  useEffect(() => {
-    const connectWebSocket = () => {
-      if (ws.current?.readyState === WebSocket.OPEN) return;
+  const connectWebSocket = useCallback(() => {
+    if (reconnectAttempts.current >= maxReconnectAttempts) {
+      console.error('Max reconnection attempts reached');
+      return;
+    }
 
-      console.log('Attempting WebSocket connection to:', WS_URL);
-      
-      ws.current = new WebSocket(WS_URL);
-      
-      ws.current.onopen = () => {
-        console.log('WebSocket Connected Successfully');
-        setWsConnected(true);
-        reconnectAttempts.current = 0;
-        
-        // Send heartbeat every 30 seconds
-        const heartbeat = setInterval(() => {
-          if (ws.current?.readyState === WebSocket.OPEN) {
-            ws.current.send('ping');
-          }
-        }, 30000);
-        
-        return () => clearInterval(heartbeat);
-      };
+    const wsUrl = 'wss://ozai.ngrok.app/ws';
+    console.log('Attempting WebSocket connection to:', wsUrl);
 
-      ws.current.onmessage = (event) => {
-        console.log('Received WebSocket message:', event.data);
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'new_classification') {
-            processAIResponse(data.data);
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      };
+    ws.current = new WebSocket(wsUrl);
 
-      ws.current.onclose = (event) => {
-        console.log('WebSocket Disconnected:', event.code, event.reason);
-        setWsConnected(false);
-        
-        // Attempt to reconnect with exponential backoff
-        const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-        console.log(`Reconnecting in ${timeout/1000} seconds...`);
-        setTimeout(connectWebSocket, timeout);
-        reconnectAttempts.current++;
-      };
-
-      ws.current.onerror = (error) => {
-        console.error('WebSocket Error:', error);
-      };
+    ws.current.onopen = () => {
+      console.log('WebSocket Connected Successfully');
+      reconnectAttempts.current = 0;
+      setWsStatus('connected');
     };
 
+    ws.current.onmessage = (event) => {
+      console.log('Received WebSocket message:', event.data);
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_classification') {
+          processAIResponse(data.data);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    };
+
+    ws.current.onclose = (event) => {
+      console.log('WebSocket Connection Closed:', event.code, event.reason);
+      
+      // Clear any existing reconnect timeout
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
+
+      // Attempt to reconnect with exponential backoff
+      const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
+      console.log(`Attempting to reconnect in ${backoffTime/1000} seconds...`);
+      
+      reconnectTimeout.current = setTimeout(() => {
+        reconnectAttempts.current++;
+        connectWebSocket();
+      }, backoffTime);
+      setWsStatus('disconnected');
+    };
+
+    ws.current.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+    };
+  }, [processAIResponse]);
+
+  // Initialize WebSocket connection
+  useEffect(() => {
     connectWebSocket();
 
+    // Cleanup function
     return () => {
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
       if (ws.current) {
         ws.current.close();
       }
     };
+  }, [connectWebSocket]);
+
+  // Add heartbeat to keep connection alive
+  useEffect(() => {
+    const heartbeat = setInterval(() => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000); // Send heartbeat every 30 seconds
+
+    return () => clearInterval(heartbeat);
   }, []);
 
   const processAIResponse = useCallback((response) => {
@@ -313,6 +335,16 @@ const App = () => {
           transportSeekingCargo={entries.transportSeekingCargo}
           isLoading={isLoading}
         />
+
+        <div className={`fixed bottom-4 right-4 px-3 py-1 rounded-full text-sm ${
+          wsStatus === 'connected' ? 'bg-green-100 text-green-800' :
+          wsStatus === 'disconnected' ? 'bg-red-100 text-red-800' :
+          'bg-yellow-100 text-yellow-800'
+        }`}>
+          {wsStatus === 'connected' ? '🟢 Bağlı' :
+           wsStatus === 'disconnected' ? '🔴 Bağlantı Kesildi' :
+           '🟡 Bağlanıyor...'}
+        </div>
       </div>
     </div>
   );
