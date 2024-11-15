@@ -3,9 +3,12 @@ import { Search } from 'lucide-react';
 import LogisticsDashboard from './components/LogisticsDashboard';
 
 // Updated API configuration
-const BASE_URL = "https://ozai.ngrok.app";
+const BASE_URL = window.location.hostname === 'localhost' 
+  ? "https://ozai.ngrok.app"
+  : "https://ozai.ngrok.app";
+
 const API_URL = `${BASE_URL}/predict`;
-const WS_URL = 'wss://ozai.ngrok.app/ws';
+const WS_URL = `wss://ozai.ngrok.app/ws`;
 
 const App = () => {
   const [inputMessage, setInputMessage] = useState('');
