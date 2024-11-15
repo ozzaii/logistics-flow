@@ -119,18 +119,23 @@ const EntryCard = ({ entry }) => {
   );
 };
 
-const LogisticsDashboard = ({ cargoSeekingTransport, transportSeekingCargo, isLoading }) => {
-  console.log('Dashboard received:', { cargoSeekingTransport, transportSeekingCargo }); // Add this debug log
+const LogisticsDashboard = ({ cargoSeekingTransport = [], transportSeekingCargo = [], isLoading }) => {
+  console.log('Dashboard received:', { cargoSeekingTransport, transportSeekingCargo });
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Loading skeleton */}
         <div className="bg-white rounded-xl shadow-lg p-6 animate-pulse">
-          {/* Add loading skeleton UI */}
+          <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="space-y-3">
+            <div className="h-8 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-gray-200 rounded"></div>
+          </div>
         </div>
       </div>
     );
   }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Cargo Seeking Transport */}
@@ -139,13 +144,19 @@ const LogisticsDashboard = ({ cargoSeekingTransport, transportSeekingCargo, isLo
           <Package className="w-6 h-6 text-blue-500" />
           <h2 className="text-xl font-semibold">Araç Arayanlar</h2>
           <span className="ml-auto bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
-            {cargoSeekingTransport.length}
+            {cargoSeekingTransport?.length || 0}
           </span>
         </div>
         <div className="space-y-4">
-          {cargoSeekingTransport.map((entry) => (
-            <EntryCard key={entry.id} entry={entry} />
-          ))}
+          {cargoSeekingTransport?.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Henüz kayıt bulunmamaktadır
+            </div>
+          ) : (
+            cargoSeekingTransport.map((entry) => (
+              <EntryCard key={entry.id} entry={entry} />
+            ))
+          )}
         </div>
       </div>
 
@@ -155,13 +166,19 @@ const LogisticsDashboard = ({ cargoSeekingTransport, transportSeekingCargo, isLo
           <Truck className="w-6 h-6 text-blue-500" />
           <h2 className="text-xl font-semibold">Yük Arayanlar</h2>
           <span className="ml-auto bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
-            {transportSeekingCargo.length}
+            {transportSeekingCargo?.length || 0}
           </span>
         </div>
         <div className="space-y-4">
-          {transportSeekingCargo.map((entry) => (
-            <EntryCard key={entry.id} entry={entry} />
-          ))}
+          {transportSeekingCargo?.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              Henüz kayıt bulunmamaktadır
+            </div>
+          ) : (
+            transportSeekingCargo.map((entry) => (
+              <EntryCard key={entry.id} entry={entry} />
+            ))
+          )}
         </div>
       </div>
     </div>
