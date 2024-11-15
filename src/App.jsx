@@ -85,175 +85,45 @@ const App = () => {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (reconnectAttempts.current >= maxReconnectAttempts) {
-      setWsStatus('failed');
+    if (ws.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
-    try {
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        console.log('WebSocket already connected');
-        return;
+    const socket = new WebSocket(WS_URL);
+    
+    socket.addEventListener('open', () => {
+      console.log('WebSocket Connected Successfully');
+      setWsStatus('connected');
+    });
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_classification') {
+          processAIResponse(data.data);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
       }
+    });
 
-      const socket = new WebSocket(WS_URL);
-      socket.binaryType = 'blob';
-
-      socket.addEventListener('open', () => {
-        console.log('WebSocket Connected Successfully');
-        reconnectAttempts.current = 0;
-        setWsStatus('connected');
-        // Initial ping
-        socket.send(JSON.stringify({ type: 'ping' }));
-      });
-
-      socket.addEventListener('message', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'pong') {
-            lastPongReceived.current = Date.now();
-          } else if (data.type === 'new_classification') {
-            processAIResponse(data.data);
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      });
-
-      socket.addEventListener('close', (event) => {
-        if (wsStatus === 'disconnected') return; // Prevent multiple reconnection attempts
-        
-        setWsStatus('disconnected');
-        if (reconnectTimeout.current) {
-          clearTimeout(reconnectTimeout.current);
-        }
-
-        const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-        console.log(`Attempting to reconnect in ${backoffTime/1000} seconds...`);
-        
-        reconnectTimeout.current = setTimeout(() => {
-          reconnectAttempts.current++;
-          connectWebSocket();
-        }, backoffTime);
-      });
-
-      socket.addEventListener('error', (error) => {
-        console.error('WebSocket error:', error);
-        if (socket.readyState === WebSocket.OPEN) {
-          socket.close();
-        }
-      });
-
-      ws.current = socket;
-    } catch (error) {
-      console.error('Error creating WebSocket:', error);
+    socket.addEventListener('close', () => {
       setWsStatus('disconnected');
-    }
-  }, [wsStatus, processAIResponse]);
+      setTimeout(() => connectWebSocket(), 1000);
+    });
 
-  // Add this useEffect for WebSocket initialization and cleanup
-  useEffect(() => {
-    const initWebSocket = () => {
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        console.log('WebSocket already connected');
-        return;
-      }
+    ws.current = socket;
+  }, [processAIResponse]);
 
-      const socket = new WebSocket(WS_URL);
-      socket.binaryType = 'blob';
-
-      socket.addEventListener('open', () => {
-        console.log('WebSocket Connected Successfully');
-        reconnectAttempts.current = 0;
-        setWsStatus('connected');
-        socket.send(JSON.stringify({ type: 'ping' }));
-      });
-
-      socket.addEventListener('message', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'pong') {
-            lastPongReceived.current = Date.now();
-          } else if (data.type === 'new_classification') {
-            processAIResponse(data.data);
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      });
-
-      socket.addEventListener('close', () => {
-        if (wsStatus === 'disconnected') return;
-        setWsStatus('disconnected');
-      });
-
-      socket.addEventListener('error', () => {
-        socket?.close();
-      });
-
-      ws.current = socket;
-    };
-
-    initWebSocket();
-
-    // Cleanup function
-    return () => {
-      if (ws.current) {
-        ws.current.close();
-        ws.current = null;
-      }
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-      }
-      if (healthCheckInterval.current) {
-        clearInterval(healthCheckInterval.current);
-      }
-    };
-  }, []); // Empty dependency array to run only once on mount
-
-  // Separate useEffect for reconnection logic
-  useEffect(() => {
-    if (wsStatus === 'disconnected' && reconnectAttempts.current < maxReconnectAttempts) {
-      const backoffTime = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-      console.log(`Attempting to reconnect in ${backoffTime/1000} seconds...`);
-      
-      reconnectTimeout.current = setTimeout(() => {
-        reconnectAttempts.current++;
-        connectWebSocket();
-      }, backoffTime);
-    }
-  }, [wsStatus]);
-
-  // Add heartbeat to keep connection alive
+  // Simplified heartbeat
   useEffect(() => {
     const heartbeat = setInterval(() => {
       if (ws.current?.readyState === WebSocket.OPEN) {
         ws.current.send(JSON.stringify({ type: 'ping' }));
       }
-    }, 30000); // Send heartbeat every 30 seconds
+    }, 30000);
 
     return () => clearInterval(heartbeat);
-  }, []);
-
-  // Add this effect for health checking
-  useEffect(() => {
-    healthCheckInterval.current = setInterval(() => {
-      if (ws.current?.readyState === WebSocket.OPEN) {
-        // Check if we haven't received a pong in more than 30 seconds
-        if (Date.now() - lastPongReceived.current > 30000) {
-          console.log('No pong received in 30s, reconnecting...');
-          ws.current.close();
-        } else {
-          ws.current.send(JSON.stringify({ type: 'ping' }));
-        }
-      }
-    }, 15000); // Check every 15 seconds
-
-    return () => {
-      if (healthCheckInterval.current) {
-        clearInterval(healthCheckInterval.current);
-      }
-    };
   }, []);
 
   const handleSubmit = async () => {
