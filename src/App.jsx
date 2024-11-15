@@ -85,24 +85,26 @@ const App = () => {
     try {
       console.log('Processing response:', response);
       
-      // Get the classification text and remove markdown formatting
-      const classificationText = response.classification.replace(/\*\*/g, '');
-      
-      // Create an object to store the parsed values
-      const parsedData = {};
+      // Get the classification text and clean it up
+      const classificationText = response.classification
+        .replace(/\*\*Cevap:\*\*\n+/g, '')  // Remove the "Cevap:" header
+        .replace(/\*\*/g, '')                // Remove all remaining asterisks
+        .trim();
       
       // Split into lines and process each line
       const lines = classificationText.split('\n')
-        .filter(line => line.trim() && line.includes(':'))
+        .filter(line => line.trim())
         .map(line => {
-          // Remove numbers and clean up the line
+          // Remove the number prefix and clean up
           const cleanLine = line.replace(/^\d+\.\s*/, '').trim();
-          const [key, ...valueParts] = cleanLine.split(':');
-          const value = valueParts.join(':').trim();
+          // Split only on the first colon
+          const [key, ...valueParts] = cleanLine.split(/:(.*)/s);
+          const value = valueParts.join('').trim();
           return { key: key.trim(), value };
         });
 
-      // Map the parsed lines to our entry structure
+      console.log('Parsed lines:', lines); // Debug log
+
       const entry = {
         id: Date.now(),
         timestamp: response.timestamp,
@@ -114,7 +116,7 @@ const App = () => {
         amount: lines.find(l => l.key === 'Tonaj/Miktar')?.value || 'BELİRTİLMEMİŞ',
         price: lines.find(l => l.key === 'Fiyat Bilgisi')?.value || 'BELİRTİLMEMİŞ',
         date: lines.find(l => l.key === 'Tarih')?.value || 'BELİRTİLMEMİŞ',
-        contact: lines.find(l => l.key === 'İletişim')?.value?.replace(/☎️/g, '') || 'BELİRTİLMEMİŞ',
+        contact: lines.find(l => l.key === 'İletişim')?.value || 'BELİRTİLMEMİŞ',
         extraInfo: lines.find(l => l.key === 'Ekstra Bilgi')?.value || 'BELİRTİLMEMİŞ'
       };
 
@@ -122,14 +124,15 @@ const App = () => {
 
       // Update appropriate list based on message type
       setEntries(prevEntries => {
-        if (entry.messageType === 'CARGO_SEEKING_TRANSPORT') {
+        const messageType = lines.find(l => l.key === 'Mesaj Tipi')?.value;
+        if (messageType === 'CARGO_SEEKING_TRANSPORT') {
           const newEntries = {
             ...prevEntries,
             cargoSeekingTransport: [entry, ...prevEntries.cargoSeekingTransport]
           };
           console.log('Updated entries:', newEntries);
           return newEntries;
-        } else if (entry.messageType === 'TRANSPORT_SEEKING_CARGO') {
+        } else if (messageType === 'TRANSPORT_SEEKING_CARGO') {
           const newEntries = {
             ...prevEntries,
             transportSeekingCargo: [entry, ...prevEntries.transportSeekingCargo]
